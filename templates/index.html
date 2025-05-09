@@ -10,8 +10,8 @@
             font-family: 'Segoe UI', sans-serif;
         }
         .container {
-            max-width: 600px;
-            margin-top: 80px;
+            max-width: 700px;
+            margin-top: 70px;
         }
         .card {
             padding: 25px;
@@ -27,15 +27,24 @@
     <div class="container">
         <div class="card bg-white">
             <h2 class="mb-4 text-center text-primary">📧 Email Classifier</h2>
-            <form method="POST" action="/classify">
+            <form method="POST" action="/">
                 <div class="mb-3">
-                    <label for="email_content" class="form-label">Paste Email Content Below:</label>
-                    <textarea name="email_content" class="form-control" id="email_content" rows="8" required></textarea>
+                    <label for="email" class="form-label">Email ID:</label>
+                    <input type="email" name="email" class="form-control" id="email" placeholder="example@email.com" required>
+                </div>
+                <div class="mb-3">
+                    <label for="subject" class="form-label">Subject:</label>
+                    <input type="text" name="subject" class="form-control" id="subject" placeholder="Enter subject" required>
+                </div>
+                <div class="mb-3">
+                    <label for="content" class="form-label">Email Content:</label>
+                    <textarea name="content" class="form-control" id="content" rows="8" required></textarea>
                 </div>
                 <div class="d-grid">
                     <button type="submit" class="btn btn-primary">Classify Email</button>
                 </div>
             </form>
+
             {% if category %}
                 <div class="alert alert-success mt-4 text-center">
                     <strong>Predicted Category:</strong> {{ category }}

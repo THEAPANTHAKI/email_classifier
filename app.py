@@ -3,7 +3,7 @@ import sqlite3
 from langdetect import detect
 from openai import AzureOpenAI
 
-# Hardcoded Azure OpenAI credentials
+# Azure OpenAI credentials
 client = AzureOpenAI(
     api_key="5ymS2hEfEggWKjLUxIjvzrz5lzaTQBLwJliMXLYb3RZ4ASNEhcXiJQQJ99BEACHYHv6XJ3w3AAAAACOGiAVd",  
     azure_endpoint="https://theap-madml99h-eastus2.cognitiveservices.azure.com/", 
@@ -13,7 +13,7 @@ deployment = "gpt-4.1"
 
 app = Flask(__name__)
 
-# Ensure database table exists
+# Ensure DB table exists
 def ensure_table():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
@@ -29,7 +29,7 @@ def ensure_table():
     conn.commit()
     conn.close()
 
-# Classify intent using Azure OpenAI
+# Classify email using Azure
 def classify_intent(content):
     response = client.chat.completions.create(
         model=deployment,
@@ -58,10 +58,7 @@ def classify_intent(content):
                     "If the email content is unclear or doesn't match any category, return 'General Query'."
                 )
             },
-            {
-                "role": "user",
-                "content": content[:300]
-            }
+            {"role": "user", "content": content[:300]}
         ],
         temperature=0.0,
         max_tokens=50,
@@ -69,7 +66,7 @@ def classify_intent(content):
     )
     return response.choices[0].message.content.strip()
 
-# Home route with form and result display
+# Home route
 @app.route("/", methods=["GET", "POST"])
 def home():
     ensure_table()
@@ -94,7 +91,7 @@ def home():
 
     return render_template("index.html", category=category)
 
-# Route to view past classifications
+# View past entries
 @app.route("/logs")
 def logs():
     conn = sqlite3.connect("email_classification.db")
