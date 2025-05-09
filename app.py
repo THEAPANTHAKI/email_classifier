@@ -13,7 +13,7 @@ deployment = "gpt-4.1"
 
 app = Flask(__name__)
 
-# Create DB table if it doesn't exist
+# Ensure database table exists
 def ensure_table():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
@@ -30,7 +30,7 @@ def ensure_table():
     conn.commit()
     conn.close()
 
-# Call Azure OpenAI to classify the email
+# Use Azure OpenAI to classify email
 def classify_intent(content):
     response = client.chat.completions.create(
         model=deployment,
@@ -38,7 +38,8 @@ def classify_intent(content):
             {
                 "role": "system",
                 "content": (
-                    "You are a loan support AI assistant. Your job is to classify the customer's email into exactly one of the following predefined categories:\n\n"
+                    "You are a loan support AI assistant. Your job is to classify customer emails "
+                    "into one of the following categories:\n\n"
                     "- New Loan Inquiry\n"
                     "- Loan Closure\n"
                     "- Repayment Issue\n"
@@ -54,12 +55,14 @@ def classify_intent(content):
                     "- Co-Applicant or Guarantor Issue\n"
                     "- Loan Rejection Appeal\n"
                     "- General Query\n\n"
-                    "Read the email carefully and output ONLY the exact category name from the list above. "
-                    "Do NOT explain your choice or add any extra text. "
-                    "If the email content is unclear or doesn't match any category, return 'General Query'."
+                    "Carefully read the full email content and match it to the **closest** category above. "
+                    "Return ONLY the exact category name. Do not explain. If unsure, return 'General Query'."
                 )
             },
-            {"role": "user", "content": content[:300]}
+            {
+                "role": "user",
+                "content": content  # Send full content now
+            }
         ],
         temperature=0.0,
         max_tokens=50,
@@ -67,7 +70,7 @@ def classify_intent(content):
     )
     return response.choices[0].message.content.strip()
 
-# Home route (form + result)
+# Homepage route (form + result)
 @app.route("/", methods=["GET", "POST"])
 def home():
     ensure_table()
@@ -99,7 +102,7 @@ def home():
 
     return render_template("index.html", category=category)
 
-# Logs page
+# Logs route
 @app.route("/logs")
 def logs():
     conn = sqlite3.connect("email_classification.db")
