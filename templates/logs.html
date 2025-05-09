@@ -7,28 +7,26 @@
     <style>
         body {
             background-color: #f8f9fa;
-            font-family: 'Segoe UI', sans-serif;
         }
         .container {
-            max-width: 95%;
             margin-top: 40px;
         }
         .table-container {
             overflow-x: auto;
         }
-        th, td {
-            white-space: nowrap;
-            vertical-align: top;
+        td {
+            white-space: pre-wrap;
+            word-break: break-word;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 class="mb-4 text-primary text-center">📄 Past Emails Log</h2>
+        <h2 class="text-primary text-center mb-4">📄 Past Emails Log</h2>
 
         {% if rows %}
         <div class="table-container">
-            <table class="table table-bordered table-hover table-striped align-middle">
+            <table class="table table-bordered table-hover table-striped">
                 <thead class="table-dark">
                     <tr>
                         <th>Email ID</th>
@@ -43,7 +41,7 @@
                     <tr>
                         <td>{{ row[0] }}</td>
                         <td>{{ row[1] }}</td>
-                        <td style="max-width: 400px;">{{ row[2] }}</td>
+                        <td>{{ row[2] }}</td>
                         <td><span class="badge bg-info text-dark">{{ row[3] }}</span></td>
                         <td>{{ row[4] }}</td>
                     </tr>
@@ -52,7 +50,7 @@
             </table>
         </div>
         {% else %}
-        <p class="text-muted text-center">No email records found.</p>
+        <p class="text-muted text-center">No emails logged yet.</p>
         {% endif %}
 
         <div class="text-center mt-4">

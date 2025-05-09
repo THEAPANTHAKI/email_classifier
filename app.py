@@ -13,24 +13,24 @@ deployment = "gpt-4.1"
 
 app = Flask(__name__)
 
-# Ensure the emails table exists with timestamp
+# Create DB table if it doesn't exist
 def ensure_table():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
     cur.execute('''
         CREATE TABLE IF NOT EXISTS emails (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT,
-            subject TEXT,
-            content TEXT,
-            category TEXT,
-            timestamp TEXT
+            email TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT NOT NULL,
+            timestamp TEXT NOT NULL
         )
     ''')
     conn.commit()
     conn.close()
 
-# Classify email intent
+# Call Azure OpenAI to classify the email
 def classify_intent(content):
     response = client.chat.completions.create(
         model=deployment,
@@ -67,38 +67,48 @@ def classify_intent(content):
     )
     return response.choices[0].message.content.strip()
 
-# Homepage
+# Home route (form + result)
 @app.route("/", methods=["GET", "POST"])
 def home():
     ensure_table()
     category = None
 
     if request.method == "POST":
-        email = request.form["email"]
-        subject = request.form["subject"]
-        content = request.form["content"]
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        email = request.form.get("email", "").strip()
+        subject = request.form.get("subject", "").strip()
+        content = request.form.get("content", "").strip()
+
+        if not email or not subject or not content:
+            return "<h3 style='color:red;'>All fields are required.</h3>"
 
         try:
             category = classify_intent(content)
         except Exception as e:
             return f"<h2>Classification Failed</h2><p>{str(e)}</p>"
 
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         conn = sqlite3.connect("email_classification.db")
         cur = conn.cursor()
-        cur.execute("INSERT INTO emails (email, subject, content, category, timestamp) VALUES (?, ?, ?, ?, ?)",
-                    (email.strip(), subject.strip(), content.strip(), category, timestamp))
+        cur.execute("""
+            INSERT INTO emails (email, subject, content, category, timestamp)
+            VALUES (?, ?, ?, ?, ?)
+        """, (email, subject, content, category, timestamp))
         conn.commit()
         conn.close()
 
     return render_template("index.html", category=category)
 
-# Logs view
+# Logs page
 @app.route("/logs")
 def logs():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
-    cur.execute("SELECT email, subject, content, category, timestamp FROM emails ORDER BY timestamp DESC")
+    cur.execute("""
+        SELECT email, subject, content, category, timestamp
+        FROM emails
+        ORDER BY timestamp DESC
+    """)
     rows = cur.fetchall()
     conn.close()
     return render_template("logs.html", rows=rows)
