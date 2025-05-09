@@ -1,19 +1,18 @@
 from flask import Flask, request, render_template
 import sqlite3
-from langdetect import detect
 from openai import AzureOpenAI
 
 # Azure OpenAI credentials
 client = AzureOpenAI(
-    api_key="5ymS2hEfEggWKjLUxIjvzrz5lzaTQBLwJliMXLYb3RZ4ASNEhcXiJQQJ99BEACHYHv6XJ3w3AAAAACOGiAVd",  
-    azure_endpoint="https://theap-madml99h-eastus2.cognitiveservices.azure.com/", 
+    api_key="5ymS2hEfEggWKjLUxIjvzrz5lzaTQBLwJliMXLYb3RZ4ASNEhcXiJQQJ99BEACHYHv6XJ3w3AAAAACOGiAVd",
+    azure_endpoint="https://theap-madml99h-eastus2.cognitiveservices.azure.com/",
     api_version="2024-12-01-preview"
 )
 deployment = "gpt-4.1"
 
 app = Flask(__name__)
 
-# Ensure DB table exists
+# Create DB table if not exists
 def ensure_table():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
@@ -29,7 +28,7 @@ def ensure_table():
     conn.commit()
     conn.close()
 
-# Classify email using Azure
+# Classify email intent
 def classify_intent(content):
     response = client.chat.completions.create(
         model=deployment,
@@ -66,7 +65,7 @@ def classify_intent(content):
     )
     return response.choices[0].message.content.strip()
 
-# Home route
+# Homepage
 @app.route("/", methods=["GET", "POST"])
 def home():
     ensure_table()
@@ -91,7 +90,7 @@ def home():
 
     return render_template("index.html", category=category)
 
-# View past entries
+# Logs page
 @app.route("/logs")
 def logs():
     conn = sqlite3.connect("email_classification.db")
@@ -101,6 +100,5 @@ def logs():
     conn.close()
     return render_template("logs.html", rows=rows)
 
-# Local run
 if __name__ == "__main__":
     app.run(debug=True)
