@@ -35,6 +35,7 @@
                         <th>Subject</th>
                         <th>Email Content</th>
                         <th>Predicted Category</th>
+                        <th>Timestamp</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -44,6 +45,7 @@
                         <td>{{ row[1] }}</td>
                         <td style="max-width: 400px;">{{ row[2] }}</td>
                         <td><span class="badge bg-info text-dark">{{ row[3] }}</span></td>
+                        <td>{{ row[4] }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

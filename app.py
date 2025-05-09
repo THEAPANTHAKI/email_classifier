@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template
 import sqlite3
+from datetime import datetime
 from openai import AzureOpenAI
 
 # Azure OpenAI credentials
@@ -12,7 +13,7 @@ deployment = "gpt-4.1"
 
 app = Flask(__name__)
 
-# Create DB table if not exists
+# Ensure the emails table exists with timestamp
 def ensure_table():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
@@ -22,7 +23,8 @@ def ensure_table():
             email TEXT,
             subject TEXT,
             content TEXT,
-            category TEXT
+            category TEXT,
+            timestamp TEXT
         )
     ''')
     conn.commit()
@@ -75,6 +77,7 @@ def home():
         email = request.form["email"]
         subject = request.form["subject"]
         content = request.form["content"]
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
             category = classify_intent(content)
@@ -83,19 +86,19 @@ def home():
 
         conn = sqlite3.connect("email_classification.db")
         cur = conn.cursor()
-        cur.execute("INSERT INTO emails (email, subject, content, category) VALUES (?, ?, ?, ?)",
-                    (email.strip(), subject.strip(), content.strip(), category))
+        cur.execute("INSERT INTO emails (email, subject, content, category, timestamp) VALUES (?, ?, ?, ?, ?)",
+                    (email.strip(), subject.strip(), content.strip(), category, timestamp))
         conn.commit()
         conn.close()
 
     return render_template("index.html", category=category)
 
-# Logs page
+# Logs view
 @app.route("/logs")
 def logs():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
-    cur.execute("SELECT email, subject, content, category FROM emails")
+    cur.execute("SELECT email, subject, content, category, timestamp FROM emails ORDER BY timestamp DESC")
     rows = cur.fetchall()
     conn.close()
     return render_template("logs.html", rows=rows)
