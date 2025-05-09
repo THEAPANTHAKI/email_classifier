@@ -3,17 +3,17 @@ import sqlite3
 from langdetect import detect
 from openai import AzureOpenAI
 
-#Hardcoded Azure OpenAI credentials
+# Hardcoded Azure OpenAI credentials
 client = AzureOpenAI(
     api_key="5ymS2hEfEggWKjLUxIjvzrz5lzaTQBLwJliMXLYb3RZ4ASNEhcXiJQQJ99BEACHYHv6XJ3w3AAAAACOGiAVd",  
     azure_endpoint="https://theap-madml99h-eastus2.cognitiveservices.azure.com/", 
     api_version="2024-12-01-preview"
 )
-deployment = "gpt-4.1" 
+deployment = "gpt-4.1"
 
 app = Flask(__name__)
 
-# the SQLite DB and table exist
+# Ensure database table exists
 def ensure_table():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
@@ -29,8 +29,7 @@ def ensure_table():
     conn.commit()
     conn.close()
 
-# classify the intent of the email using Azure OpenAI
-# classify the intent of the email using Azure OpenAI
+# Classify intent using Azure OpenAI
 def classify_intent(content):
     response = client.chat.completions.create(
         model=deployment,
@@ -70,10 +69,12 @@ def classify_intent(content):
     )
     return response.choices[0].message.content.strip()
 
-# Home page with form
+# Home route with form and result display
 @app.route("/", methods=["GET", "POST"])
 def home():
     ensure_table()
+    category = None
+
     if request.method == "POST":
         email = request.form["email"]
         subject = request.form["subject"]
@@ -91,11 +92,9 @@ def home():
         conn.commit()
         conn.close()
 
-        return f"<h2>Category: {category}</h2><a href='/'>Classify Another</a>"
+    return render_template("index.html", category=category)
 
-    return render_template("form.html")
-
-# View past logs
+# Route to view past classifications
 @app.route("/logs")
 def logs():
     conn = sqlite3.connect("email_classification.db")
@@ -105,6 +104,6 @@ def logs():
     conn.close()
     return render_template("logs.html", rows=rows)
 
-# Only used locally (ignored by gunicorn on Render)
+# Local run
 if __name__ == "__main__":
     app.run(debug=True)
