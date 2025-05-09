@@ -30,6 +30,7 @@ def ensure_table():
     conn.close()
 
 # classify the intent of the email using Azure OpenAI
+# classify the intent of the email using Azure OpenAI
 def classify_intent(content):
     response = client.chat.completions.create(
         model=deployment,
@@ -37,14 +38,25 @@ def classify_intent(content):
             {
                 "role": "system",
                 "content": (
-                    "You are an AI assistant that reads customer emails and classifies them into:\n"
+                    "You are a loan support AI assistant. Your job is to classify the customer's email into exactly one of the following predefined categories:\n\n"
                     "- New Loan Inquiry\n"
                     "- Loan Closure\n"
-                    "- General Query\n"
                     "- Repayment Issue\n"
+                    "- Interest Rate Query\n"
                     "- Document Submission\n"
-                    "- Interest Rate Query\n\n"
-                    "Output ONLY the category name. If unsure, output 'General Query'."
+                    "- Loan Status Update\n"
+                    "- Prepayment Request\n"
+                    "- Part-Payment Request\n"
+                    "- Balance Transfer Request\n"
+                    "- Top-Up Loan Request\n"
+                    "- Loan Statement Request\n"
+                    "- Loan Eligibility Check\n"
+                    "- Co-Applicant or Guarantor Issue\n"
+                    "- Loan Rejection Appeal\n"
+                    "- General Query\n\n"
+                    "Read the email carefully and output ONLY the exact category name from the list above. "
+                    "Do NOT explain your choice or add any extra text. "
+                    "If the email content is unclear or doesn't match any category, return 'General Query'."
                 )
             },
             {
