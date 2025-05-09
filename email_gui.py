@@ -3,7 +3,8 @@ from tkinter import scrolledtext
 import sqlite3
 import importlib.util
 
-# Load the classifier safely
+
+# Loading
 spec = importlib.util.spec_from_file_location("email_classifier", "email_classifier.py")
 email_classifier = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(email_classifier)
@@ -55,7 +56,8 @@ def show_logs_window():
     rows = cursor.fetchall()
     conn.close()
 
-    # Create popup window
+
+    #popup window
     log_window = tk.Toplevel(root)
     log_window.title("Previous Classifications")
     log_window.geometry("700x400")
@@ -69,7 +71,9 @@ def show_logs_window():
         text_area.insert(tk.END, f"{row[0]:<25}{row[1]:<40}{row[2]}\n")
     text_area.configure(state='disabled')
 
-# Main GUI setup
+
+
+#GUI setup
 root = tk.Tk()
 root.title("Email Classifier")
 
