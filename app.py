@@ -155,7 +155,14 @@ def home():
         try:
             intent = classify(content, intent_prompt)
             loan_type = classify(content, loan_type_prompt)
-            sub_process = classify(content, sub_process_prompt)
+
+            sub_process_raw = classify(content, sub_process_prompt)
+            sub_process = (
+                sub_process_raw
+                .replace("Sub-process:", "")
+                .replace("**", "")
+                .strip()
+            )
 
             message_type_raw = classify(content, message_type_prompt)
             message_type = (
