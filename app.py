@@ -156,7 +156,15 @@ def home():
             intent = classify(content, intent_prompt)
             loan_type = classify(content, loan_type_prompt)
             sub_process = classify(content, sub_process_prompt)
-            message_type = classify(content, message_type_prompt)
+
+            message_type_raw = classify(content, message_type_prompt)
+            message_type = (
+                message_type_raw
+                .split("Reason")[0]
+                .replace("Type of message:", "")
+                .replace("**", "")
+                .strip()
+            )
         except Exception as e:
             return f"<h2>Classification Failed</h2><p>{str(e)}</p>"
 
