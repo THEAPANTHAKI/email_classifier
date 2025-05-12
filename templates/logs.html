@@ -32,7 +32,10 @@
                         <th>Email ID</th>
                         <th>Subject</th>
                         <th>Email Content</th>
-                        <th>Predicted Category</th>
+                        <th>Intent</th>
+                        <th>Loan Type</th>
+                        <th>Sub-Process</th>
+                        <th>Message Type</th>
                         <th>Timestamp</th>
                     </tr>
                 </thead>
@@ -43,7 +46,10 @@
                         <td>{{ row[1] }}</td>
                         <td>{{ row[2] }}</td>
                         <td><span class="badge bg-info text-dark">{{ row[3] }}</span></td>
-                        <td>{{ row[4] }}</td>
+                        <td><span class="badge bg-secondary">{{ row[4] }}</span></td>
+                        <td><span class="badge bg-warning text-dark">{{ row[5] }}</span></td>
+                        <td><span class="badge bg-success">{{ row[6] }}</span></td>
+                        <td>{{ row[7] }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

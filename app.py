@@ -23,46 +23,114 @@ def ensure_table():
             email TEXT NOT NULL,
             subject TEXT NOT NULL,
             content TEXT NOT NULL,
-            category TEXT NOT NULL,
+            intent TEXT NOT NULL,
+            loan_type TEXT NOT NULL,
+            sub_process TEXT NOT NULL,
+            message_type TEXT NOT NULL,
             timestamp TEXT NOT NULL
         )
     ''')
     conn.commit()
     conn.close()
 
-# Use Azure OpenAI to classify email
-def classify_intent(content):
+# Classifier Prompts
+intent_prompt = (
+    "You are a loan support AI assistant. Your job is to classify customer emails "
+    "into one of the following categories:\n\n"
+    "- New Loan Inquiry\n"
+    "- Loan Closure\n"
+    "- Repayment Issue\n"
+    "- Interest Rate Query\n"
+    "- Document Submission\n"
+    "- Loan Status Update\n"
+    "- Prepayment Request\n"
+    "- Part-Payment Request\n"
+    "- Balance Transfer Request\n"
+    "- Top-Up Loan Request\n"
+    "- Loan Statement Request\n"
+    "- Loan Eligibility Check\n"
+    "- Co-Applicant or Guarantor Issue\n"
+    "- Loan Rejection Appeal\n"
+    "- General Query\n\n"
+    "Return ONLY the exact category name from the list above. If unsure, return 'General Query'."
+)
+
+loan_type_prompt = (
+    "Based on the email content, classify the loan type. Choose ONLY one:\n"
+    "- Home Loan\n"
+    "- Vehicle Loan / Auto Loan\n"
+    "- Loan Against Property\n"
+    "- Gold Loan\n"
+    "- Loan Against Securities\n"
+    "- Loan Against Fixed Deposit\n"
+    "- Commercial Property Loan\n"
+    "- Construction Loan\n"
+    "- Personal Loan\n"
+    "- Education Loan\n"
+    "- Travel Loan\n"
+    "- Medical Loan\n"
+    "- Wedding Loan\n"
+    "- Consumer Durable Loan\n"
+    "- Credit Card Loan\n"
+    "- Business Loan\n"
+    "- Working Capital Loan\n"
+    "- Machinery Loan\n"
+    "- Invoice Financing\n"
+    "- MSME Loan\n"
+    "- SME Loan\n"
+    "- Startup Loan\n"
+    "- Commercial Vehicle Loan\n"
+    "- Agriculture Loan\n"
+    "- Student Loan\n"
+    "- NRI Loan\n"
+    "- Debt Consolidation Loan\n"
+    "- Overdraft Facility\n"
+    "- Bridge Loan\n"
+    "- Top-Up Loan\n"
+    "- Emergency Loan\n\n"
+    "If unclear, return 'General Loan'."
+)
+
+sub_process_prompt = (
+    "Classify the customer's email into one sub-process:\n"
+    "- Account Opening\n"
+    "- Account Closure\n"
+    "- Disbursement\n"
+    "- Foreclosure\n"
+    "- Collection Process\n"
+    "- Payment Handling\n"
+    "- Refund Request\n"
+    "- Charges & Fees\n"
+    "- Loan Restructuring\n"
+    "- Feedback or Complaint\n"
+    "- Legal Related\n"
+    "- Settlement\n"
+    "- Document Submission\n"
+    "- Recovery\n"
+    "- Loan Status Check\n"
+    "- Co-applicant or Guarantor Issues\n"
+    "- Eligibility Check\n"
+    "- Statement Request\n"
+    "- General Sub-process"
+)
+
+message_type_prompt = (
+    "Classify the type of message based on tone and content:\n"
+    "- Query\n"
+    "- Request\n"
+    "- Complaint\n"
+    "- Feedback\n"
+    "- Technical Issue\n"
+    "- General Communication"
+)
+
+# Classifier Function
+def classify(content, system_prompt):
     response = client.chat.completions.create(
         model=deployment,
         messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a loan support AI assistant. Your job is to classify customer emails "
-                    "into one of the following categories:\n\n"
-                    "- New Loan Inquiry\n"
-                    "- Loan Closure\n"
-                    "- Repayment Issue\n"
-                    "- Interest Rate Query\n"
-                    "- Document Submission\n"
-                    "- Loan Status Update\n"
-                    "- Prepayment Request\n"
-                    "- Part-Payment Request\n"
-                    "- Balance Transfer Request\n"
-                    "- Top-Up Loan Request\n"
-                    "- Loan Statement Request\n"
-                    "- Loan Eligibility Check\n"
-                    "- Co-Applicant or Guarantor Issue\n"
-                    "- Loan Rejection Appeal\n"
-                    "- General Query\n\n"
-                    "Carefully read the full email content and match it to the **closest** category above. "
-                    "Return ONLY the exact category name. Do not explain. If unsure, return 'General Query'."
-                )
-            },
-            {
-                "role": "user",
-                "content": content  # Send full content now
-            }
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": content}
         ],
         temperature=0.0,
         max_tokens=50,
@@ -70,11 +138,11 @@ def classify_intent(content):
     )
     return response.choices[0].message.content.strip()
 
-# Homepage route (form + result)
+# Homepage route
 @app.route("/", methods=["GET", "POST"])
 def home():
     ensure_table()
-    category = None
+    results = None
 
     if request.method == "POST":
         email = request.form.get("email", "").strip()
@@ -85,7 +153,10 @@ def home():
             return "<h3 style='color:red;'>All fields are required.</h3>"
 
         try:
-            category = classify_intent(content)
+            intent = classify(content, intent_prompt)
+            loan_type = classify(content, loan_type_prompt)
+            sub_process = classify(content, sub_process_prompt)
+            message_type = classify(content, message_type_prompt)
         except Exception as e:
             return f"<h2>Classification Failed</h2><p>{str(e)}</p>"
 
@@ -94,13 +165,20 @@ def home():
         conn = sqlite3.connect("email_classification.db")
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO emails (email, subject, content, category, timestamp)
-            VALUES (?, ?, ?, ?, ?)
-        """, (email, subject, content, category, timestamp))
+            INSERT INTO emails (email, subject, content, intent, loan_type, sub_process, message_type, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (email, subject, content, intent, loan_type, sub_process, message_type, timestamp))
         conn.commit()
         conn.close()
 
-    return render_template("index.html", category=category)
+        results = {
+            "intent": intent,
+            "loan_type": loan_type,
+            "sub_process": sub_process,
+            "message_type": message_type
+        }
+
+    return render_template("index.html", results=results)
 
 # Logs route
 @app.route("/logs")
@@ -108,7 +186,7 @@ def logs():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
     cur.execute("""
-        SELECT email, subject, content, category, timestamp
+        SELECT email, subject, content, intent, loan_type, sub_process, message_type, timestamp
         FROM emails
         ORDER BY timestamp DESC
     """)

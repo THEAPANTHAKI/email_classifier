@@ -45,9 +45,15 @@
                 </div>
             </form>
 
-            {% if category %}
-                <div class="alert alert-success mt-4 text-center">
-                    <strong>Predicted Category:</strong> {{ category }}
+            {% if results %}
+                <div class="alert alert-success mt-4">
+                    <h5 class="text-center">📊 Classification Result</h5>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>Intent:</strong> {{ results.intent }}</li>
+                        <li class="list-group-item"><strong>Loan Type:</strong> {{ results.loan_type }}</li>
+                        <li class="list-group-item"><strong>Sub-Process:</strong> {{ results.sub_process }}</li>
+                        <li class="list-group-item"><strong>Message Type:</strong> {{ results.message_type }}</li>
+                    </ul>
                 </div>
             {% endif %}
 
