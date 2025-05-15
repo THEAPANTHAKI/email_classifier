@@ -1,51 +1,65 @@
 import os
 import base64
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-# api scope
+#scope
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
-# loading prompt
-def load_sql_if_empty():
+#intent groups
+INTENT_GROUPS = {
+    "New Loan Inquiry": ["New Loan Inquiry", "General Query", "Document Submission"],
+    "Repayment Issue": ["Repayment Issue", "Payment Handling"],
+    "Loan Closure": ["Loan Closure", "Foreclosure"],
+    "Interest Rate Query": ["Interest Rate Query", "General Query"],
+    "Document Submission": ["Document Submission", "General Query"],
+    "Loan Status Update": ["Loan Status Update", "Loan Status Check"],
+    "Prepayment Request": ["Prepayment Request", "Part-Payment Request"],
+    "General Query": ["General Query"],
+    "Top-Up Loan Request": ["Top-Up Loan Request", "New Loan Inquiry"],
+    "Balance Transfer Request": ["Balance Transfer Request"],
+    "Loan Statement Request": ["Loan Statement Request", "Statement Request"],
+    "Loan Eligibility Check": ["Loan Eligibility Check", "Eligibility Check"],
+    "Co-Applicant or Guarantor Issue": ["Co-Applicant or Guarantor Issue"],
+    "Loan Rejection Appeal": ["Loan Rejection Appeal"],
+}
+
+#db init
+def init_db():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
-
-    # Check if table exists and has data
-    cur.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='keyword_mapping';")
-    if cur.fetchone()[0] == 0:
-        print("'keyword_mapping' table does not exist. Creating from prompt.sql...")
-        with open("prompt.sql", "r") as f:
-            cur.executescript(f.read())
-            conn.commit()
-            print("Table created and populated.")
-    else:
-        cur.execute("SELECT count(*) FROM keyword_mapping;")
-        if cur.fetchone()[0] == 0:
-            print("Table exists but is empty. Populating from prompt.sql...")
-            with open("prompt.sql", "r") as f:
-                cur.executescript(f.read())
-                conn.commit()
-                print("Table populated.")
-        else:
-            print(" 'keyword_mapping' table already populated.")
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT,
+            subject TEXT,
+            content TEXT,
+            intent TEXT,
+            message_type TEXT,
+            loan_type TEXT,
+            subprocess TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            duplicate_tag TEXT DEFAULT 'No'
+        )
+    ''')
+    conn.commit()
     conn.close()
 
-# classifying
+# classifier
 def classify_email_from_db(content):
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
 
-    words = content.lower().split()
+    content = content.lower()
+    words = content.split()
 
-    #defaults
-    intent = "General Query"
-    loan_type = "General Loan"
+    intent = "General Inquiry"
+    loan_type = "Other"
     message_type = "General Communication"
     subprocess = "General Sub-process"
 
@@ -61,53 +75,27 @@ def classify_email_from_db(content):
     conn.close()
     return intent, loan_type, message_type, subprocess
 
-# init db
-def init_db():
+# duplicte 
+def is_duplicate_email(sender, intent):
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
+    time_threshold = datetime.now() - timedelta(hours=24)
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS emails (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT,
-            subject TEXT,
-            content TEXT,
-            intent TEXT,
-            message_type TEXT,
-            loan_type TEXT,
-            subprocess TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    similar_intents = INTENT_GROUPS.get(intent, [intent])
+    placeholders = ','.join('?' for _ in similar_intents)
 
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS keyword_mapping (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            keyword TEXT NOT NULL,
-            intent TEXT,
-            loan_type TEXT,
-            message_type TEXT,
-            subprocess TEXT
-        )
-    ''')
-
-    conn.commit()
+    query = f'''
+        SELECT COUNT(*) FROM emails
+        WHERE email = ? AND intent IN ({placeholders}) AND timestamp >= ?
+    '''
+    cur.execute(query, (sender, *similar_intents, time_threshold))
+    count = cur.fetchone()[0]
     conn.close()
+    return count > 0
 
-#save
-def save_to_db(sender, subject, content, intent, message_type, loan_type, subprocess):
-    conn = sqlite3.connect("email_classification.db")
-    cur = conn.cursor()
-    cur.execute('''
-        INSERT INTO emails (email, subject, content, intent, message_type, loan_type, subprocess)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (sender, subject, content, intent, message_type, loan_type, subprocess))
-    conn.commit()
-    conn.close()
-
-# auto reply
-def send_reply(service, to):
-    message = MIMEText("Thank you for contacting us. We've received your email and will get back to you shortly.")
+#reply
+def send_reply(service, to, reply_body):
+    message = MIMEText(reply_body)
     message['to'] = to
     message['subject'] = "Auto-response from Loan Support"
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -115,6 +103,8 @@ def send_reply(service, to):
 
 # main
 def main():
+    init_db()
+
     creds = None
     if os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
@@ -128,31 +118,62 @@ def main():
             token.write(creds.to_json())
 
     service = build('gmail', 'v1', credentials=creds)
-    results = service.users().messages().list(userId='me', labelIds=['INBOX'], q='is:unread').execute()
+
+    results = service.users().messages().list(userId='me', labelIds=['INBOX'], q="is:unread").execute()
     messages = results.get('messages', [])
 
     for msg in messages:
-        msg_data = service.users().messages().get(userId='me', id=msg['id'], format='full').execute()
+        msg_data = service.users().messages().get(userId='me', id=msg['id']).execute()
         headers = msg_data['payload']['headers']
-        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '(No Subject)')
-        sender = next((h['value'] for h in headers if h['name'] == 'From'), '(Unknown)')
+        subject = ""
+        sender = ""
 
-        payload = msg_data['payload']
-        parts = payload.get('parts')
-        if parts and parts[0]['body'].get('data'):
-            data = parts[0]['body']['data']
+        for header in headers:
+            if header['name'] == 'Subject':
+                subject = header['value']
+            if header['name'] == 'From':
+                sender = header['value']
+
+        # normalize 
+        if '<' in sender:
+            sender = sender.split('<')[-1].replace('>', '').strip()
+
+        #get email
+        if 'data' in msg_data['payload']['body']:
+            body_data = msg_data['payload']['body']['data']
         else:
-            data = payload['body'].get('data', '')
-        content = base64.urlsafe_b64decode(data.encode('UTF-8')).decode('UTF-8', errors='ignore')
+            body_data = msg_data['payload']['parts'][0]['body']['data']
 
-        intent, loan_type, message_type, subprocess = classify_email_from_db(content)
+        decoded_body = base64.urlsafe_b64decode(body_data).decode("utf-8")
 
-        save_to_db(sender, subject, content, intent, message_type, loan_type, subprocess)
-        send_reply(service, sender)
+        # clasiisfy
+        intent, loan_type, message_type, subprocess = classify_email_from_db(decoded_body)
+
+        # check 
+        duplicate = is_duplicate_email(sender, intent)
+        duplicate_tag = "Yes" if duplicate else "No"
+
+        # auto reply
+        if duplicate:
+            reply_text = "We’ve already received your request and are working on it. Thank you for your patience."
+        else:
+            reply_text = "Thank you for contacting us. We will get back to you shortly."
+
+        # save to DB
+        conn = sqlite3.connect("email_classification.db")
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO emails (email, subject, content, intent, message_type, loan_type, subprocess, timestamp, duplicate_tag)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (sender, subject, decoded_body, intent, message_type, loan_type, subprocess, datetime.now(), duplicate_tag))
+        conn.commit()
+        conn.close()
+
+        #send reply
+        send_reply(service, sender, reply_text)
+
+        # read 
         service.users().messages().modify(userId='me', id=msg['id'], body={'removeLabelIds': ['UNREAD']}).execute()
 
-# entry point
 if __name__ == '__main__':
-    init_db()
-    load_sql_if_empty()
     main()
