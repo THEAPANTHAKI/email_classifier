@@ -58,6 +58,7 @@ def classify_email_from_db(content):
     content = content.lower()
     words = content.split()
 
+    # Initialize with default values
     intent = "General Inquiry"
     loan_type = "Other"
     message_type = "General Communication"
@@ -67,13 +68,18 @@ def classify_email_from_db(content):
         cur.execute("SELECT intent, loan_type, message_type, subprocess FROM keyword_mapping WHERE keyword = ?", (word,))
         result = cur.fetchone()
         if result:
-            if result[0]: intent = result[0]
-            if result[1]: loan_type = result[1]
-            if result[2]: message_type = result[2]
-            if result[3]: subprocess = result[3]
+            if result[0] and intent == "General Inquiry":
+                intent = result[0]
+            if result[1] and loan_type == "Other":
+                loan_type = result[1]
+            if result[2] and message_type == "General Communication":
+                message_type = result[2]
+            if result[3] and subprocess == "General Sub-process":
+                subprocess = result[3]
 
     conn.close()
     return intent, loan_type, message_type, subprocess
+
 
 # duplicte 
 def is_duplicate_email(sender, intent):
