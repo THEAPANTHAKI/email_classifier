@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Logs</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h2>Email Classification Logs</h2>
+    <table id="logsTable">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Subject</th>
+                <th>Intent</th>
+                <th>Message Type</th>
+                <th>Loan Type</th>
+                <th>Subprocess</th>
+                <th>Timestamp</th>
+                <th>Duplicate</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        function fetchLogs() {
+            fetch('/logs')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.querySelector("#logsTable tbody");
+                    tbody.innerHTML = '';
+                    data.forEach(row => {
+                        const tr = document.createElement("tr");
+                        row.forEach(cell => {
+                            const td = document.createElement("td");
+                            td.textContent = cell;
+                            tr.appendChild(td);
+                        });
+                        tbody.appendChild(tr);
+                    });
+                });
+        }
+
+        fetchLogs();
+        setInterval(fetchLogs, 10000); // auto refresh every 10s
+    </script>
+</body>
+</html>
