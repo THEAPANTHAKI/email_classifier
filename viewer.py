@@ -18,12 +18,12 @@ def fetch_logs():
 @app.route('/')
 def index():
     return render_template('logs.html')
-
 @app.route('/logs')
 def logs():
     data = fetch_logs()
     return jsonify(data)
 
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+  port = int(os.environ.get('PORT', 5050))
+app.run(host='0.0.0.0', port=port)
