@@ -1,6 +1,7 @@
 import os
 import base64
 import sqlite3
+import re
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from google.oauth2.credentials import Credentials
@@ -8,10 +9,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-#scope
+# Scopes for Gmail API
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
-#intent groups
+# Intent groups for duplicate checking
 INTENT_GROUPS = {
     "New Loan Inquiry": ["New Loan Inquiry", "General Query", "Document Submission"],
     "Repayment Issue": ["Repayment Issue", "Payment Handling"],
@@ -29,7 +30,6 @@ INTENT_GROUPS = {
     "Loan Rejection Appeal": ["Loan Rejection Appeal"],
 }
 
-#db init
 def init_db():
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
@@ -50,38 +50,46 @@ def init_db():
     conn.commit()
     conn.close()
 
-# classifier
 def classify_email_from_db(content):
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
 
+    # Normalize and tokenize content
     content = content.lower()
-    words = content.split()
+    words = re.findall(r'\b\w+\b', content)
+    phrases = [' '.join(words[i:i+2]) for i in range(len(words) - 1)]
+    tokens = words + phrases
 
-    # Initialize with default values
-    intent = "General Inquiry"
-    loan_type = "Other"
-    message_type = "General Communication"
-    subprocess = "General Sub-process"
+    intent_matches = []
+    loan_type_matches = []
+    message_type_matches = []
+    subprocess_matches = []
 
-    for word in words:
-        cur.execute("SELECT intent, loan_type, message_type, subprocess FROM keyword_mapping WHERE keyword = ?", (word,))
+    for token in tokens:
+        cur.execute('''
+            SELECT intent, loan_type, message_type, subprocess
+            FROM keyword_mapping
+            WHERE keyword = ?
+        ''', (token,))
         result = cur.fetchone()
         if result:
-            if result[0] and intent == "General Inquiry":
-                intent = result[0]
-            if result[1] and loan_type == "Other":
-                loan_type = result[1]
-            if result[2] and message_type == "General Communication":
-                message_type = result[2]
-            if result[3] and subprocess == "General Sub-process":
-                subprocess = result[3]
+            if result[0]: intent_matches.append(result[0])
+            if result[1]: loan_type_matches.append(result[1])
+            if result[2]: message_type_matches.append(result[2])
+            if result[3]: subprocess_matches.append(result[3])
 
     conn.close()
+
+    def most_common(lst, default):
+        return max(set(lst), key=lst.count) if lst else default
+
+    intent = most_common(intent_matches, "General Inquiry")
+    loan_type = most_common(loan_type_matches, "Other")
+    message_type = most_common(message_type_matches, "General Communication")
+    subprocess = most_common(subprocess_matches, "General Sub-process")
+
     return intent, loan_type, message_type, subprocess
 
-
-# duplicte 
 def is_duplicate_email(sender, intent):
     conn = sqlite3.connect("email_classification.db")
     cur = conn.cursor()
@@ -99,7 +107,6 @@ def is_duplicate_email(sender, intent):
     conn.close()
     return count > 0
 
-#reply
 def send_reply(service, to, reply_body):
     message = MIMEText(reply_body)
     message['to'] = to
@@ -107,7 +114,6 @@ def send_reply(service, to, reply_body):
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     service.users().messages().send(userId='me', body={'raw': raw}).execute()
 
-# main
 def main():
     init_db()
 
@@ -116,7 +122,11 @@ def main():
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except Exception:
+                print("Token refresh failed. Delete token.json and re-authenticate.")
+                return
         else:
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
@@ -140,32 +150,27 @@ def main():
             if header['name'] == 'From':
                 sender = header['value']
 
-        # normalize 
         if '<' in sender:
             sender = sender.split('<')[-1].replace('>', '').strip()
 
-        #get email
+        # Extract email body
         if 'data' in msg_data['payload']['body']:
             body_data = msg_data['payload']['body']['data']
         else:
             body_data = msg_data['payload']['parts'][0]['body']['data']
 
-        decoded_body = base64.urlsafe_b64decode(body_data).decode("utf-8")
+        decoded_body = base64.urlsafe_b64decode(body_data).decode("utf-8", errors="ignore")
 
-        # clasiisfy
         intent, loan_type, message_type, subprocess = classify_email_from_db(decoded_body)
-
-        # check 
         duplicate = is_duplicate_email(sender, intent)
         duplicate_tag = "Yes" if duplicate else "No"
 
-        # auto reply
-        if duplicate:
-            reply_text = "We’ve already received your request and are working on it. Thank you for your patience."
-        else:
-            reply_text = "Thank you for contacting us. We will get back to you shortly."
+        reply_text = (
+            "We’ve already received your request and are working on it. Thank you for your patience."
+            if duplicate else
+            "Thank you for contacting us. We will get back to you shortly."
+        )
 
-        # save to DB
         conn = sqlite3.connect("email_classification.db")
         cur = conn.cursor()
         cur.execute('''
@@ -175,10 +180,7 @@ def main():
         conn.commit()
         conn.close()
 
-        #send reply
         send_reply(service, sender, reply_text)
-
-        # read 
         service.users().messages().modify(userId='me', id=msg['id'], body={'removeLabelIds': ['UNREAD']}).execute()
 
 if __name__ == '__main__':
