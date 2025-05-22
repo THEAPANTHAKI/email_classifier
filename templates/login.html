@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex items-center justify-center h-screen bg-gray-100">
+    <form method="POST" class="bg-white p-8 rounded shadow-md w-96">
+        <h2 class="text-2xl font-bold mb-4 text-center">Admin Login</h2>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="text-red-600">{{ messages[0] }}</div>
+            {% endif %}
+        {% endwith %}
+        <input name="username" class="w-full mb-4 p-2 border rounded" placeholder="Username" required>
+        <input type="password" name="password" class="w-full mb-4 p-2 border rounded" placeholder="Password" required>
+        <button class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Login</button>
+    </form>
+</body>
+</html>
