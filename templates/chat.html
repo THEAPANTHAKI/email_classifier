@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Bot</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        #chatbox { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; }
+        .user { font-weight: bold; color: #1a73e8; }
+        .bot { color: #333; }
+        input[type="text"] { width: 80%; padding: 10px; }
+        button { padding: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Email Classifier Chatbot</h2>
+    <div id="chatbox"></div>
+    <br>
+    <input type="text" id="userInput" placeholder="Type your question...">
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        function sendMessage() {
+            const userText = document.getElementById("userInput").value;
+            if (!userText) return;
+
+            const chatbox = document.getElementById("chatbox");
+            chatbox.innerHTML += `<p class="user">You: ${userText}</p>`;
+            document.getElementById("userInput").value = "";
+
+            fetch("/api/messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: userText })
+            })
+            .then(res => res.json())
+            .then(data => {
+                chatbox.innerHTML += `<p class="bot">Bot: ${data.text}</p>`;
+                chatbox.scrollTop = chatbox.scrollHeight;
+            });
+        }
+    </script>
+</body>
+</html>
